@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - email: string (required) - User email address
+    //   - displayName: string (optional) - User display name
+    //   - photoURL: string (optional) - User profile photo URL
+    //   - createdAt: timestamp (required) - Account creation timestamp
+    //   - role: string (optional) - User role (e.g., 'admin', 'client')
+    //
+    // Collection: users/{userId}/diario_prenatal
+    // Document ID: entryId (Auto-generated)
+    // Fields:
+    //   - userId: string (required) - The UID of the user who wrote the entry
+    //   - feeling: string (optional) - The feeling ID
+    //   - feelingLabel: string (optional) - The human-readable feeling label
+    //   - feelingEmoji: string (optional) - The emoji representing the feeling
+    //   - message: string (required) - The message content (max 5000 chars)
+    //   - timestamp: timestamp (required) - When the entry was created
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "mamaserenamx@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'role']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (data.role == 'client' || isAdmin());
+    }
+
+    function isValidDiaryEntry(data) {
+      return hasRequiredFields(['userId', 'message', 'timestamp']) &&
+             hasOnlyAllowedFields(['userId', 'feeling', 'feelingLabel', 'feelingEmoji', 'message', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 5000 &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidReminder(data) {
+      return hasRequiredFields(['userId', 'time', 'frequency', 'enabled']) &&
+             hasOnlyAllowedFields(['userId', 'time', 'frequency', 'enabled', 'updatedAt', 'fcmToken']) &&
+             data.userId == request.auth.uid &&
+             data.time is string && data.time.matches("^([01]?[0-9]|2[0-3]):[0-5][0-9]$") &&
+             data.frequency in ['daily', 'weekly', 'biweekly'] &&
+             data.enabled is bool &&
+             (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() < 500));
+    }
+
+    function isValidAgenda(data) {
+      return hasRequiredFields(['completed']) &&
+             hasOnlyAllowedFields(['completed', 'updatedAt']) &&
+             data.completed is list &&
+             data.completed.size() <= 100; // Limit size to prevent abuse
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'client' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /users/{userId}/diario_prenatal/{entryId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidDiaryEntry(request.resource.data);
+      allow update: if isOwner(userId) && isValidDiaryEntry(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /users/{userId}/settings/reminders {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidReminder(request.resource.data);
+      allow update: if isOwner(userId) && isValidReminder(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /users/{userId}/settings/agenda {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidAgenda(request.resource.data);
+      allow update: if isOwner(userId) && isValidAgenda(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+  }
+}

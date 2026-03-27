@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "format": "uri", "description": "User profile photo URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["uid", "email"]
+    },
+    "DiaryEntry": {
+      "title": "Diary Entry",
+      "description": "A prenatal connection diary entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who wrote the entry" },
+        "feeling": { "type": "string", "description": "The feeling ID (e.g., calma, fuerte)" },
+        "feelingLabel": { "type": "string", "description": "The human-readable feeling label" },
+        "feelingEmoji": { "type": "string", "description": "The emoji representing the feeling" },
+        "message": { "type": "string", "description": "The message content" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the entry was created" }
+      },
+      "required": ["userId", "message", "timestamp"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "User reminder settings for the diary",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user" },
+        "time": { "type": "string", "description": "Time of the reminder (HH:mm)" },
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "biweekly"], "description": "Frequency of the reminder" },
+        "enabled": { "type": "boolean", "description": "Whether the reminder is active" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the settings were last updated" },
+        "fcmToken": { "type": "string", "description": "Firebase Cloud Messaging token for push notifications" }
+      },
+      "required": ["userId", "time", "frequency", "enabled"]
+    },
+    "Agenda": {
+      "title": "Agenda",
+      "description": "User agenda progress for prenatal activities",
+      "type": "object",
+      "properties": {
+        "completed": { "type": "array", "items": { "type": "string" }, "description": "List of completed activity IDs" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the progress was last updated" }
+      },
+      "required": ["completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/users/{userId}/diario_prenatal/{entryId}": {
+      "schema": "DiaryEntry",
+      "description": "Prenatal diary entries for a specific user"
+    },
+    "/users/{userId}/settings/reminders": {
+      "schema": "Reminder",
+      "description": "User reminder settings"
+    },
+    "/users/{userId}/settings/agenda": {
+      "schema": "Agenda",
+      "description": "User agenda progress"
+    }
+  }
+}
