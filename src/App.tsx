@@ -2,8 +2,7 @@ import React, { Component, useState, useEffect, useCallback } from 'react';
 import { 
   auth, 
   db, 
-  googleProvider, 
-  signInWithPopup, 
+  signInAnonymously, 
   onAuthStateChanged, 
   collection, 
   doc, 
@@ -28,8 +27,6 @@ import {
   Save, 
   Sparkles, 
   Trash2, 
-  LogOut, 
-  LogIn,
   AlertCircle,
   Loader2,
   Bell,
@@ -273,11 +270,11 @@ function DiaryApp() {
   // Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      setIsAuthReady(true);
-      setLoading(false);
-
       if (u) {
+        setUser(u);
+        setIsAuthReady(true);
+        setLoading(false);
+
         // Sync user profile to Firestore
         const userRef = doc(db, 'users', u.uid);
         try {
@@ -285,9 +282,9 @@ function DiaryApp() {
           if (!userSnap.exists()) {
             await setDoc(userRef, {
               uid: u.uid,
-              email: u.email,
-              displayName: u.displayName,
-              photoURL: u.photoURL,
+              email: u.email || 'guest@mamaserena.local',
+              displayName: u.displayName || 'Mamá Serena',
+              photoURL: u.photoURL || null,
               createdAt: serverTimestamp(),
               role: 'client'
             });
@@ -312,6 +309,9 @@ function DiaryApp() {
         } catch (error) {
           console.error("Error syncing user profile or settings:", error);
         }
+      } else {
+        // Auto-login anonymously if no user
+        handleLogin();
       }
     });
     return () => unsubscribe();
@@ -387,17 +387,9 @@ function DiaryApp() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInAnonymously(auth);
     } catch (error) {
-      console.error("Error logging in:", error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-    } catch (error) {
-      console.error("Error logging out:", error);
+      console.error("Error logging in anonymously:", error);
     }
   };
 
@@ -480,30 +472,8 @@ function DiaryApp() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-brand-50">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-brand-100 p-8 text-center"
-        >
-          <div className="w-20 h-20 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Heart className="w-10 h-10 text-brand-600 fill-brand-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-4">Diario Prenatal</h1>
-          <p className="text-slate-600 mb-8 leading-relaxed">
-            Un espacio sagrado para conectar con tu bebé y documentar este viaje mágico hacia la maternidad.
-          </p>
-          <button 
-            onClick={handleLogin}
-            className="w-full py-4 px-6 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-lg hover:-translate-y-1"
-          >
-            <LogIn className="w-5 h-5" />
-            Iniciar con Google
-          </button>
-          <p className="mt-6 text-xs text-slate-400 uppercase tracking-widest font-bold">
-            Parto Sin Miedo
-          </p>
-        </motion.div>
+      <div className="w-full h-screen flex items-center justify-center bg-brand-50">
+        <Loader2 className="w-12 h-12 text-brand-500 animate-spin" />
       </div>
     );
   }
@@ -521,26 +491,25 @@ function DiaryApp() {
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-brand-200 overflow-hidden">
-              <img 
-                src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=c09f91&color=fff`} 
-                alt={user.displayName || 'User'} 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-brand-200 overflow-hidden bg-brand-100 flex items-center justify-center">
+              {user.photoURL ? (
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName || 'User'} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <Heart className="w-6 h-6 text-brand-500 fill-brand-500" />
+              )}
             </div>
             <div className="text-left">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight truncate max-w-[120px] sm:max-w-none">{user.displayName}</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight truncate max-w-[120px] sm:max-w-none">
+                {user.displayName || 'Mamá Serena'}
+              </h2>
               <p className="text-[10px] sm:text-xs text-brand-600 font-bold uppercase tracking-wider">Mi Diario Prenatal</p>
             </div>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-            title="Cerrar Sesión"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Mobile Menu Overlay */}
@@ -589,15 +558,6 @@ function DiaryApp() {
                       {item.label}
                     </button>
                   ))}
-                </div>
-                <div className="p-6 border-t border-slate-50">
-                  <button 
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl border-2 border-slate-100 text-slate-500 font-bold hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    Cerrar Sesión
-                  </button>
                 </div>
               </motion.div>
             </>

@@ -62,7 +62,7 @@ service cloud.firestore {
     function isValidUser(data) {
       return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'role']) &&
              data.uid == request.auth.uid &&
-             isValidEmail(data.email) &&
+             (data.email == null || isValidEmail(data.email)) &&
              (data.role == 'client' || isAdmin());
     }
 

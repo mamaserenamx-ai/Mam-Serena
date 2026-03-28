@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, setDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, getDocFromServer } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
@@ -11,7 +11,6 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
-export const googleProvider = new GoogleAuthProvider();
 
 // Connection test
 async function testConnection() {
@@ -26,7 +25,7 @@ async function testConnection() {
 testConnection();
 
 export { 
-  signInWithPopup, 
+  signInAnonymously,
   onAuthStateChanged, 
   collection, 
   doc, 
